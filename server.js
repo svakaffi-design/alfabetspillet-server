@@ -3,6 +3,9 @@ const fs = require("fs");
 const cors = require("cors");
 
 const app = express();
+app.get("/test", (req, res) => {
+  res.send("SERVER UPDATED");
+});
 app.use(cors());
 app.use(express.json());
 
