@@ -3,41 +3,70 @@ const fs = require("fs");
 const cors = require("cors");
 
 const app = express();
-app.get("/test", (req, res) => {
-  res.send("SERVER UPDATED");
-});
+
 app.use(cors());
 app.use(express.json());
 
 const FILE = "scores.json";
 
-app.get("/scores", (req, res) => {
-    if (!fs.existsSync(FILE)) {
-        fs.writeFileSync(FILE, JSON.stringify([]));
-    }
-    const scores = JSON.parse(fs.readFileSync(FILE));
-    res.json(scores);
+/* ---------- Hjelpefunksjoner ---------- */
+
+function getScores() {
+  if (!fs.existsSync(FILE)) {
+    fs.writeFileSync(FILE, JSON.stringify({}));
+  }
+  return JSON.parse(fs.readFileSync(FILE));
+}
+
+function saveScores(data) {
+  fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
+}
+
+/* ---------- Test route ---------- */
+
+app.get("/test", (req, res) => {
+  res.send("SERVER UPDATED");
 });
 
-app.post("/scores", (req, res) => {
-    const { name, time } = req.body;
+/* ---------- Hent score for et spill ---------- */
 
-    if (!name || !time) {
-        return res.status(400).json({ error: "Invalid data" });
-    }
+app.get("/scores/:game", (req, res) => {
+  const game = req.params.game;
+  const allScores = getScores();
+  res.json(allScores[game] || []);
+});
 
-    const scores = JSON.parse(fs.readFileSync(FILE));
-    scores.push({ name, time });
-    scores.sort((a, b) => a.time - b.time);
+/* ---------- Lagre score for et spill ---------- */
 
-    const top10 = scores.slice(0, 10);
-    fs.writeFileSync(FILE, JSON.stringify(top10, null, 2));
+app.post("/scores/:game", (req, res) => {
+  const game = req.params.game;
+  const { name, diff, time } = req.body;
 
-    res.json(top10);
+  if (!name || (diff === undefined && time === undefined)) {
+    return res.status(400).json({ error: "Invalid data" });
+  }
+
+  const allScores = getScores();
+  if (!allScores[game]) allScores[game] = [];
+
+  if (diff !== undefined) {
+    allScores[game].push({ name, diff: Number(diff) });
+    allScores[game].sort((a, b) => a.diff - b.diff);
+  }
+
+  if (time !== undefined) {
+    allScores[game].push({ name, time: Number(time) });
+    allScores[game].sort((a, b) => a.time - b.time);
+  }
+
+  allScores[game] = allScores[game].slice(0, 10);
+
+  saveScores(allScores);
+  res.json(allScores[game]);
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+  console.log("Server running on port " + PORT);
 });
