@@ -11,8 +11,14 @@
 <body>
 
 <h2>Alfabet Snake</h2>
-<p>Spis B → C → ... → Å. A er alltid hodet.</p>
+<p>Spis B → C → ... → Å</p>
+
 <canvas id="game" width="600" height="600"></canvas>
+
+<div>
+  <h3>Top 10</h3>
+  <ol id="scores"></ol>
+</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -27,11 +33,13 @@ const alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L",
 
 let snake = [{x: 10, y: 10}];
 let lettersCollected = ["A"];
-
 let dx = 0;
 let dy = 0;
 let nextLetterIndex = 1;
 let food = randomPosition();
+
+let startTime = Date.now();
+let finished = false;
 
 document.addEventListener("keydown", e => {
     if (e.key === "ArrowUp" && dy === 0) { dx = 0; dy = -1; }
@@ -49,6 +57,8 @@ function randomPosition() {
 
 function gameLoop() {
 
+    if (finished) return;
+
     if (dx === 0 && dy === 0) {
         draw();
         requestAnimationFrame(gameLoop);
@@ -60,7 +70,6 @@ function gameLoop() {
         y: snake[0].y + dy
     };
 
-    // Vegg = game over
     if (newHead.x < 0 || newHead.x >= tileCount ||
         newHead.y < 0 || newHead.y >= tileCount) {
         alert("Game Over!");
@@ -69,14 +78,20 @@ function gameLoop() {
 
     snake.unshift(newHead);
 
-    // Spist riktig bokstav?
     if (newHead.x === food.x && newHead.y === food.y) {
 
         lettersCollected.push(alphabet[nextLetterIndex]);
 
         if (nextLetterIndex >= alphabet.length - 1) {
-            alert("Du vant alfabetspillet!");
-            document.location.reload();
+            finished = true;
+            const totalTime = (Date.now() - startTime) / 1000;
+
+            setTimeout(async () => {
+                await saveScore(totalTime);
+                alert("Du vant! Tid: " + totalTime.toFixed(2) + " sek");
+                document.location.reload();
+            }, 100);
+
             return;
         }
 
@@ -88,7 +103,7 @@ function gameLoop() {
     }
 
     draw();
-    setTimeout(gameLoop, 150);
+    setTimeout(gameLoop, 120);
 }
 
 function draw() {
@@ -97,7 +112,6 @@ function draw() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Tegn snake med faste bokstaver
     for (let i = 0; i < snake.length; i++) {
         ctx.fillStyle = "black";
         ctx.fillText(
@@ -107,7 +121,6 @@ function draw() {
         );
     }
 
-    // Tegn neste bokstav
     ctx.fillStyle = "red";
     ctx.fillText(
         alphabet[nextLetterIndex],
@@ -116,6 +129,34 @@ function draw() {
     );
 }
 
+async function saveScore(time) {
+    let name = prompt("Skriv navnet ditt:");
+    if (!name) name = "Anonym";
+
+    await fetch("https://alfabetspillet-server.onrender.com/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, time })
+    });
+
+    loadScores();
+}
+
+async function loadScores() {
+    const response = await fetch("https://alfabetspillet-server.onrender.com/scores");
+    const scores = await response.json();
+
+    const list = document.getElementById("scores");
+    list.innerHTML = "";
+
+    scores.forEach((score, index) => {
+        let li = document.createElement("li");
+        li.textContent = `${index + 1}. ${score.name} - ${score.time.toFixed(2)} sek`;
+        list.appendChild(li);
+    });
+}
+
+loadScores();
 gameLoop();
 </script>
 
